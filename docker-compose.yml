@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # Container Utama (PHP + Python)
+  olt-app:
+    build: .
+    container_name: olt-backend
+    restart: always
+    volumes:
+      - .:/var/www/html
+      - ./writable:/var/www/html/writable
+    # User www-data butuh akses ke SQLite
+    #user: "www-data:www-data"
+
+  # Container Web Server (Nginx)
+  olt-web:
+    image: nginx:alpine
+    container_name: olt-nginx
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - olt-app
+
+networks:
+  default:
+    name: olt-network

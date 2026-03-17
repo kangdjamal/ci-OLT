@@ -1,0 +1,7 @@
+venv/
+.git/
+node_modules/
+writable/debugbar/
+writable/logs/*.log
+*.zip
+*.rar

@@ -1,0 +1,26 @@
+# --- CodeIgniter 4 ---
+.env
+/writable/*
+!/writable/index.html
+!/writable/.htaccess
+
+# --- Python & Netmiko (SANGAT PENTING) ---
+# Mengabaikan folder virtual environment secara total
+/venv/
+# Mengabaikan file hasil kompilasi python di folder scripts
+scripts/__pycache__/
+scripts/*.pyc
+# Mengabaikan log jika skrip python menghasilkan file .log
+scripts/*.log
+
+# --- Dependensi & Database ---
+/vendor/
+/node_modules/
+*.sqlite
+*.db
+
+# --- Editor & OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
