@@ -50,6 +50,13 @@
             </a>
             </li>
 
+            <li class="nav-item">
+            <a class="nav-link" href="<?= base_url('olt/unconfig'); ?>">
+            <i class="fas fa-fw fa-plug"></i>
+            <span>ONU Unconfig</span>
+            </a>
+            </li>
+
             <hr class="sidebar-divider d-none d-md-block">
 
             <li class="nav-item">
@@ -77,7 +84,7 @@
                         <div class="topbar-divider d-none d-sm-block"></div>
                         <li class="nav-item dropdown no-arrow">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">IP OLT: <?= esc($ip_olt ?? 'Not Connected') ?></span>
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">IP OLT: <?= session()->get('ip_olt') ?? 'Not Connected' ?></span>
                                 <img class="img-profile rounded-circle" src="https://ui-avatars.com/api/?name=Admin&background=4e73df&color=fff">
                             </a>
                         </li>
@@ -90,7 +97,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; Jamal - Prakom 2026</span>
+                        <span>Copyright &copy; Diskominfo Sukoharjo - 2026</span>
                     </div>
                 </div>
             </footer>

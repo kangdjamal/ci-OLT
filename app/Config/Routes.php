@@ -25,3 +25,10 @@ $routes->post('olt/clear_database', 'Olt::clear_database');
 
 // Ubah dari (:segment) menjadi (:any)
 $routes->post('olt/update_card/(:any)', 'Olt::update_card/$1');
+
+$routes->get('olt/unconfig', 'Olt::unconfig');
+$routes->get('olt/auth_page/(:any)/(:any)', 'Olt::auth_page/$1/$2');
+$routes->post('olt/activate_process', 'Olt::activate_process');
+// app/Config/Routes.php
+// Tambah (:any) satu lagi di ujung, dan $3 di ujungnya juga
+$routes->match(['get', 'post'], 'olt/auth_page/(:any)/(:any)/(:any)', 'Olt::auth_page/$1/$2/$3');
