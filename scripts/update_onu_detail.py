@@ -3,6 +3,7 @@ import sys
 import sqlite3
 import re
 import time
+import json
 import os
 from pathlib import Path
 from datetime import datetime
@@ -36,7 +37,12 @@ try:
     nama = "N/A"
     tipe = "N/A"
     status = "N/A"
+    sn = "-"
     redaman_raw = "--"
+    profile = "N/A"
+    vlan = "0"
+    tcont_id = "1"
+    gemport = "1"
 
 
     # --- 2. Proses Parsing Output Detail Info ---
@@ -100,7 +106,17 @@ try:
     conn.close()
 
     net_connect.disconnect()
-    print("SUCCESS")
+    print(json.dumps({
+    "status": "success",
+    "name": nama,
+    "sn": sn,
+    "onu_status": status,
+    "redaman":redaman_final,
+    "profile": profile,
+    "vlan": vlan,
+    "tcont": tcont_id,
+    "gemport": gemport
+    }))
 
 except Exception as e:
     print(f"Error OLT: {str(e)}")

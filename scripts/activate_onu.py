@@ -1,6 +1,14 @@
 import sys
+import os  # Komentar: Anda memanggil os.getenv tapi lupa import os di kode tadi
+import sqlite3 # Komentar: Anda memanggil sqlite3 tapi lupa import di kode tadi
 import time
+from pathlib import Path
+from datetime import datetime
+from dotenv import load_dotenv
 from netmiko import ConnectHandler
+
+# Load .env di awal agar os.getenv bisa membaca file .env proyek
+load_dotenv()
 
 # 1. Validasi Argumen (Total 11 argumen dari PHP + 1 nama script = 12)
 if len(sys.argv) < 12:
@@ -41,7 +49,6 @@ try:
     net_connect = ConnectHandler(**device)
 
     # --- TAHAP 1: REGISTRASI ONU ---
-    # Kita harus masuk ke interface gpon-olt dulu
     reg_commands = [
         f'interface gpon-olt_{parent_port}',
         f'onu {onu_index} type {onu_type} sn {sn}',
@@ -49,14 +56,12 @@ try:
     ]
     output_reg = net_connect.send_config_set(reg_commands)
 
-    # Cek apakah registrasi ditolak OLT
     if "%" in output_reg or "Error" in output_reg:
         print(f"OLT_REJECTED_REG: {output_reg}")
         net_connect.disconnect()
         sys.exit(1)
 
     # --- TAHAP 2: KONFIGURASI SERVICE ---
-    # Masuk ke interface gpon-onu yang baru saja dibuat
     conf_commands = [
         f'interface gpon-onu_{port}',
         f'name {name}',
@@ -69,16 +74,30 @@ try:
     ]
     output_conf = net_connect.send_config_set(conf_commands)
 
-    # Cek apakah konfigurasi ditolak
     if "% Invalid" in output_conf or "Error" in output_conf:
         print(f"OLT_REJECTED_CONF: {output_conf}")
         net_connect.disconnect()
         sys.exit(1)
 
-    # --- TAHAP 3: SAVE (Opsional tapi disarankan) ---
-    # net_connect.send_command('write')
-
     net_connect.disconnect()
+
+    # --- TAHAP 4: UPDATE DATABASE ---
+    db_path = os.getenv("DB_PATH", "/tmp/onu.sqlite3")
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        query = """
+            UPDATE onu_devices
+            SET name = ?, status = 'ready', last_update = CURRENT_TIMESTAMP
+            WHERE onu_index = ?
+        """
+
+        cursor.execute(query, (name, port))
+        conn.commit()
+        conn.close()
+    except Exception as db_e:
+        print(f"DATABASE_LOG_ERROR: {str(db_e)}")
 
     # Berikan tanda sukses untuk PHP
     print("success")

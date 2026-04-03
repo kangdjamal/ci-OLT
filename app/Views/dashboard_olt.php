@@ -17,7 +17,7 @@
 <div class="card shadow mb-4">
     <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
         <h6 class="m-0 font-weight-bold text-primary">Daftar ONU (GPON)</h6>
-        <span class="text-xs text-muted">IP OLT: <?= esc($ip_olt) ?></span>
+
     </div>
     <div class="card-body">
         <?php if (session()->getFlashdata('pesan')) : ?>
@@ -71,13 +71,22 @@
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center">
-                                    <?php $safe_id = str_replace(['/', ':'], ['-', '_'], $onu->onu_index); ?>
-                                    <form action="<?= base_url('olt/update_card/' . $safe_id) ?>" method="post">
-                                        <?= csrf_field() ?>
-                                        <button type="submit" class="btn btn-primary btn-sm btn-circle shadow-sm">
-                                            <i class="fas fa-sync-alt"></i>
-                                        </button>
-                                    </form>
+                                <?php $safe_id = str_replace(['/', ':'], ['-', '_'], $onu->onu_index); ?>
+
+                                <div class="d-flex justify-content-center" style="gap: 8px;">
+                                <form action="<?= base_url('olt/update_card/' . $safe_id) ?>" method="post" class="m-0">
+                                <?= csrf_field() ?>
+                                <button type="submit" class="btn btn-primary btn-sm btn-circle shadow-sm" title="Refresh Detail">
+                                <i class="fas fa-sync-alt"></i>
+                                </button>
+                                </form>
+
+                                <a href="<?= base_url('olt/manage/' . $safe_id); ?>"
+                                class="btn btn-info btn-sm btn-circle shadow-sm"
+                                title="Manage ONU">
+                                <i class="fas fa-tools"></i>
+                                </a>
+                                </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

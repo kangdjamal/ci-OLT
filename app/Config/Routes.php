@@ -32,3 +32,14 @@ $routes->post('olt/activate_process', 'Olt::activate_process');
 // app/Config/Routes.php
 // Tambah (:any) satu lagi di ujung, dan $3 di ujungnya juga
 $routes->match(['get', 'post'], 'olt/auth_page/(:any)/(:any)/(:any)', 'Olt::auth_page/$1/$2/$3');
+
+// Format: $routes->get('url-di-browser', 'NamaController::NamaFunction/$1');
+$routes->get('olt/manage/(:any)', 'Olt::manage/$1');
+
+//Tombol simpan perubahan di halaman manage onu
+$routes->post('olt/update_config', 'Olt::update_config');
+
+
+//tombol HAPUS ONU
+$routes->post('olt/delete_onu', 'Olt::delete_onu');
+$routes->get('olt/unconfig', 'Olt::unconfig');

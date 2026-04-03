@@ -27,5 +27,5 @@ try:
 
 except Exception as e:
     # Cetak pesan error agar bisa ditangkap PHP
-    print(f"AUTH_FAILED: {str(e)}")
+    print(f"AUTH_FAILED: Login Gagal")
     sys.exit(1)

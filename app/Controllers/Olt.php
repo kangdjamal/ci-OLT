@@ -33,6 +33,9 @@ class Olt extends BaseController
     public function auth()
     {
         $ip   = $this->request->getPost('ip_olt');
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            return redirect()->back()->with('error', 'Format IP OLT tidak valid!');
+        }
         $user = $this->request->getPost('username');
         $pass = $this->request->getPost('password');
 
@@ -64,6 +67,11 @@ class Olt extends BaseController
 
     public function dashboard()
     {
+        // 1. Inisialisasi koneksi ke variabel $db
+        $db = \Config\Database::connect();
+
+        // 2. Gunakan variabel $db tersebut untuk reconnect (Hapus $this->)
+        $db->reconnect();
         $model = new OnuModel();
 
         // 1. Ambil data dari post
@@ -92,6 +100,8 @@ class Olt extends BaseController
             'username' => trim(session()->get('username') ?? '', "'"),
             'onu_list' => $onuData
         ];
+
+        $this->response->noCache();
 
         return view('dashboard_olt', $data);
     }
@@ -126,6 +136,7 @@ class Olt extends BaseController
 
     public function update_card($onu_id)
     {
+        // 1. Rekonstruksi format index (gpon-onu_1-1-1_3 -> gpon-onu_1/1/1:3)
         $step1 = str_replace('-', '/', $onu_id);
         $lastUnderscore = strrpos($step1, '_');
         if ($lastUnderscore !== false) {
@@ -135,27 +146,42 @@ class Olt extends BaseController
         }
         $gpon_id = str_replace('gpon/onu', 'gpon-onu', $gpon_id);
 
-        $python = env('PYTHON_VENV');
-        $script =env('SCRIPT_PATH')."update_onu_detail.py";
+        // 2. Siapkan eksekusi Python
+        $python = env('PYTHON_VENV', 'python3');
+        $script = env('SCRIPT_PATH') . "update_onu_detail.py";
 
-        // Ambil kredensial dari session
-        $ip   = escapeshellarg(session()->get('ip_olt'));
-        $user = escapeshellarg(session()->get('username'));
-        $pass = escapeshellarg(session()->get('password'));
+        $ip     = escapeshellarg(session()->get('ip_olt'));
+        $user   = escapeshellarg(session()->get('username'));
+        $pass   = escapeshellarg(session()->get('password'));
         $target = escapeshellarg($gpon_id);
 
-        // Tambahkan kredensial ke command sebelum target gpon_id
+        // Jalankan script dan tangkap output JSON
         $command = "$python $script $ip $user $pass $target 2>&1";
-        $output = shell_exec($command);
+        $output  = shell_exec($command);
+        $result  = json_decode($output);
 
-        if (trim($output) === "SUCCESS") {
-            session()->setFlashdata('pesan', "Update Berhasil!");
+        // 3. Cek apakah Python berhasil memberikan data
+        if ($result && isset($result->status) && $result->status === 'success') {
+
+            // Update hanya kolom yang ada di SQLite Sukoharjo
+            $db = \Config\Database::connect();
+            $db->table('onu_devices')
+            ->where('onu_index', $gpon_id)
+            ->update([
+                'status'  => $result->onu_status, // Misal: 'ready' atau 'working'
+                'redaman' => $result->redaman     // String redaman lengkap dari OLT
+            ]);
+
+            session()->setFlashdata('pesan', "Update Berhasil! Data OLT terbaru untuk " . ($result->name ?? $gpon_id));
             session()->setFlashdata('warna', 'success');
         } else {
-            session()->setFlashdata('pesan', 'Gagal: ' . $output);
+            // Jika Python gagal atau ada error login OLT
+            $pesan_error = $result->message ?? "Output tidak dikenal: " . $output;
+            session()->setFlashdata('pesan', 'Gagal Update: ' . $pesan_error);
             session()->setFlashdata('warna', 'danger');
         }
 
+        // Kembali ke Dashboard
         return redirect()->to(base_url('olt/dashboard'));
     }
 
@@ -211,6 +237,7 @@ class Olt extends BaseController
             'onu_list'   => $this->parseOnu($output)
         ];
 
+        $this->response->noCache();
         return view('unconfig', $data);
     }
 
@@ -286,6 +313,9 @@ class Olt extends BaseController
 
     // app/Controllers/Olt.php
 
+    /////// AKTIVASI ////////////
+
+
     public function activate_process()
     {
         // 1. Tangkap data dari form (Customer & VLAN)
@@ -333,14 +363,55 @@ class Olt extends BaseController
 
         // 6. Eksekusi & Tangkap Output (Ini yang bikin loading agak lama)
         $output  = shell_exec($command);
+        usleep(500000);
         //echo "Command: " . $command . "<br>";
         //echo "Raw Output: <pre>" . $output . "</pre>";
         //die("Proses Berhenti di Sini!");
 
         // 7. Berikan Feedback ke User
+
+
         if (strpos(strtolower($output), 'success') !== false) {
+
+
+            // --- LOGIKA TAMBAHAN: AUTO SYNC DETAIL AGAR NAMA MUNCUL DI DASHBOARD ---
+            sleep(1);
+            $db = \Config\Database::connect();
+            $db->query("PRAGMA wal_checkpoint(FULL);");
+            $db->reconnect(); // Fresh connection
+
+            $python_sync = env('PYTHON_VENV');
+            $script_sync = env('SCRIPT_PATH') . "update_onu_detail.py"; // Pakai script detail
+            $ip_sync     = escapeshellarg(session()->get('ip_olt'));
+            $user_sync   = escapeshellarg(session()->get('username'));
+            $pass_sync   = escapeshellarg(session()->get('password'));
+            $target_sync = escapeshellarg($port_fix); // Port yang baru saja diaktifkan
+
+            $cmd_sync = "$python_sync $script_sync $ip_sync $user_sync $pass_sync $target_sync 2>&1";
+            $out_sync = shell_exec($cmd_sync);
+            $res_sync = json_decode($out_sync);
+
+            if ($res_sync && $res_sync->status === 'success') {
+                // Update database SQLite agar Dashboard langsung kenal namanya
+                $model_onu = new \App\Models\OnuModel();
+                // Cari ID berdasarkan SN atau Port
+                $existing = $model_onu->where('onu_index', $port_fix)->first();
+
+                if ($existing) {
+                    $model_onu->update($existing->id, [
+                        'sn'     => $res_sync->sn,
+                        'name'   => $res_sync->name,
+                        'status' => $res_sync->onu_status,
+                        'type'   => $res_sync->type ?? 'ZTE-F609' // Opsional jika ada
+                    ]);
+                }
+            }
+            // --- END LOGIKA TAMBAHAN ---
+
             // Balik ke halaman unconfig dengan pesan sukses
-            return redirect()->to(base_url('olt/unconfig'))->with('success', "ONU $sn berhasil diaktivasi pada port $port.");
+            $safe_id = str_replace(['/', ':'], ['-', '_'], $port_fix);
+
+            return redirect()->to(base_url("olt/manage/$safe_id"))->with('success', "ONU $sn berhasil diaktivasi pada port $port_fix.");
         } else {
             // Balik ke form aktivasi sambil bawa pesan errornya
             // Ganti sementara buat debugging:
@@ -348,7 +419,201 @@ class Olt extends BaseController
         }
     }
 
+    //////////////////////
+    //////////////////////
 
+
+
+    public function manage($onu_id)
+    {
+        $model = new OnuModel();
+
+        // 1. Transformasi URL ke format Database
+        $db_index = str_replace('-', '/', $onu_id);
+        $lastUnderscore = strrpos($db_index, '_');
+        if ($lastUnderscore !== false) {
+            $db_index = substr_replace($db_index, ':', $lastUnderscore, 1);
+        }
+        $db_index = str_replace('gpon/onu', 'gpon-onu', $db_index);
+
+        // 2. Ambil data awal
+        $onu = $model->where('onu_index', $db_index)->first();
+
+        if (!$onu) {
+            session()->setFlashdata('pesan', "Data ONU [$db_index] tidak ditemukan.");
+            session()->setFlashdata('warna', 'danger');
+            return redirect()->to(base_url('olt/dashboard'));
+        }
+
+        // 3. Validasi status
+        $check_status = strtolower(trim($onu->status ?? ''));
+
+        $allowed_status = ['ready', 'working', 'online', 'up'];
+
+        if (!in_array($check_status, $allowed_status)) {
+            $pesan = "ONU [$db_index] tidak dapat dimanage. ";
+
+            if (empty($check_status) || $check_status == "-") {
+                $pesan .= "Status perangkat belum terdeteksi atau belum diaktivasi.";
+            } else {
+                $pesan .= "Status saat ini: " . strtoupper($check_status);
+            }
+
+            session()->setFlashdata('pesan', $pesan);
+            session()->setFlashdata('warna', 'warning');
+            return redirect()->to(base_url('olt/dashboard'));
+        }
+
+        // 4. Jalankan Python
+        $python = env('PYTHON_VENV');
+        $script = env('SCRIPT_PATH') . "get_manage.py";
+        $ip     = escapeshellarg(session()->get('ip_olt'));
+        $user   = escapeshellarg(session()->get('username'));
+        $pass   = escapeshellarg(session()->get('password'));
+        $target = escapeshellarg($db_index);
+
+        $command = "$python $script $ip $user $pass $target 2>&1";
+        $output  = shell_exec($command);
+
+        // Parsing JSON
+        $result = json_decode($output);
+
+        if ($result && $result->status === 'success') {
+            // Update database lokal (opsional)
+            $model->update($onu->id, [
+                'sn'     => $result->sn,
+                'name'   => $result->name,
+                'status' => $result->onu_status
+            ]);
+
+            // Ambil data terbaru dari DB lalu timpa dengan data live untuk View
+            $onu_updated = $model->where('onu_index', $db_index)->first();
+            $onu_updated->redaman = $result->redaman;
+            $onu_updated->profile = $result->profile;
+            $onu_updated->vlan    = $result->vlan;
+            $onu_updated->tcont   = $result->tcont;
+            $onu_updated->gemport = $result->gemport;
+            $onu_updated->sn      = $result->sn;
+        } else {
+            $error_msg = $result->message ?? $output;
+            session()->setFlashdata('pesan', "Gagal Sync OLT: " . $error_msg);
+            session()->setFlashdata('warna', 'warning');
+            $onu_updated = $onu; // Fallback ke data lama jika gagal
+        }
+
+        $data = [
+            'title'   => "Manage: " . $db_index,
+            'onu'     => $onu_updated,
+            'gpon_id' => $db_index
+        ];
+
+        return view('manage_onu', $data);
+    }
+
+//////////
+
+public function update_config()
+{
+    $onu_index = $this->request->getPost('onu_index');
+    $new_name  = $this->request->getPost('new_name');
+    $profile   = $this->request->getPost('tcont_profile');
+    $vlan      = $this->request->getPost('vlan_id');
+
+    // 1. Siapkan Argumen Python
+    $python = env('PYTHON_VENV');
+    $script = env('SCRIPT_PATH') . "update_profil_onu.py";
+
+    $ip     = escapeshellarg(session()->get('ip_olt'));
+    $user   = escapeshellarg(session()->get('username'));
+    $pass   = escapeshellarg(session()->get('password'));
+    $target = escapeshellarg($onu_index);
+    $name   = escapeshellarg($new_name);
+    $prof   = escapeshellarg($profile);
+    $vlan_arg = escapeshellarg($vlan);
+
+    // 2. Eksekusi Python
+    $command = "$python $script $ip $user $pass $target $name $prof $vlan_arg 2>&1";
+    $output  = shell_exec($command);
+    $result  = json_decode($output);
+
+    // 3. Response handling
+    if ($result && $result->status === 'success') {
+        session()->setFlashdata('pesan', "Sukses! Konfigurasi ONU $onu_index telah diperbarui.");
+        session()->setFlashdata('warna', 'success');
+    } else {
+        $error = $result->message ?? $output;
+        session()->setFlashdata('pesan', "Gagal Update OLT: " . $error);
+        session()->setFlashdata('warna', 'danger');
+    }
+
+    // 4. Redirect kembali ke halaman MANAGE (Gunakan format URL gpon-onu_1-2-6_11)
+    $url_index = str_replace(['/', ':'], ['-', '_'], $onu_index);
+    return redirect()->to(base_url("olt/manage/$url_index"));
+}
+
+    ///////
+
+    public function delete_onu()
+    {
+        // 1. Tangkap data dari Form POST
+        $user_answer    = $this->request->getPost('user_captcha');
+        $correct_answer = session()->get('captcha_result');
+        $onu_index      = $this->request->getPost('onu_index');
+
+        // Pengaman: Jika data index kosong, jangan lanjut
+        if (empty($onu_index)) {
+            return redirect()->to(base_url('olt/dashboard'))->with('pesan', 'Error: Index ONU tidak ditemukan.')->with('warna', 'danger');
+        }
+
+        // Buat format URL untuk redirect (Contoh: gpon-onu_1/2/6:11 -> gpon-onu_1-2-6_11)
+        $url_index = str_replace(['/', ':'], ['-', '_'], $onu_index);
+
+        // 2. VALIDASI CAPTCHA (Server-side)
+        if ($user_answer != $correct_answer) {
+            // Bersihkan session agar angka berubah lagi
+            session()->remove('captcha_result');
+
+            // Kembalikan ke halaman manage dengan pesan error
+            return redirect()->to(base_url("olt/manage/$url_index"))
+            ->with('pesan', "Gagal Hapus: Jawaban Matematika Salah!")
+            ->with('warna', 'danger');
+        }
+
+        // 3. JIKA CAPTCHA BENAR, LANJUT EKSEKUSI PYTHON
+        // Ambil path dari .env untuk fleksibilitas server
+        $python = env('PYTHON_VENV', 'python3'); // Fallback ke python3 jika env kosong
+        $script = env('SCRIPT_PATH') . "delete_onu.py";
+
+        // Ambil data session login OLT
+        $ip     = escapeshellarg(session()->get('ip_olt'));
+        $user   = escapeshellarg(session()->get('username'));
+        $pass   = escapeshellarg(session()->get('password'));
+        $target = escapeshellarg($onu_index);
+
+        // Jalankan perintah shell
+        $command = "$python $script $ip $user $pass $target 2>&1";
+        $output  = shell_exec($command);
+        $result  = json_decode($output);
+
+        // Bersihkan captcha setelah eksekusi (berhasil/gagal)
+        session()->remove('captcha_result');
+
+        // 4. HANDLING RESPON DARI PYTHON
+        if ($result && $result->status === 'success') {
+            // Jika sukses hapus di OLT & DB, arahkan ke halaman Unconfigured
+            return redirect()->to(base_url('olt/unconfig'))
+            ->with('pesan', "Sukses: ONU $onu_index telah dihapus dari OLT dan Database.")
+            ->with('warna', 'success');
+        } else {
+            // Jika Python gagal (misal telnet timeout atau DB error)
+            $error_msg = $result->message ?? "Script Error: $output";
+            return redirect()->to(base_url("olt/manage/$url_index"))
+            ->with('pesan', "Gagal Eksekusi OLT: " . $error_msg)
+            ->with('warna', 'danger');
+        }
+    }
+
+    ////////
 
     public function logout()
     {
