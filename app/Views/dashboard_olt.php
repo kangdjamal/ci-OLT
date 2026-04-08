@@ -100,3 +100,35 @@
 
 
 <?= $this->endSection() ?>
+
+<?= $this->section('script') ?>
+<script>
+$(document).ready(function() {
+    // 1. Hancurkan inisialisasi otomatis jika ada (biar tidak bentrok)
+    if ($.fn.DataTable.isDataTable('#dataTable')) {
+        $('#dataTable').DataTable().destroy();
+    }
+
+    // 2. Inisialisasi ulang dengan parameter Buttons
+    $('#dataTable').DataTable({
+        "dom": "<'row'<'col-sm-12 col-md-6'B><'col-sm-12 col-md-6'f>>" +
+        "<'row'<'col-sm-12'tr>>" +
+        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        "buttons": [
+            {
+                extend: 'csv',
+                text: '<i class="fas fa-file-csv"></i> Export CSV',
+                className: 'btn btn-sm btn-success shadow-sm'
+            },
+            {
+                extend: 'excel',
+                text: '<i class="fas fa-file-excel"></i> Export Excel',
+                className: 'btn btn-sm btn-primary shadow-sm'
+            }
+        ],
+        "pageLength": 10, // Mengembalikan paging yang hilang
+        "responsive": true
+    });
+});
+</script>
+<?= $this->endSection() ?>

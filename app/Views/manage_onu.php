@@ -60,6 +60,22 @@
         </div>
 
         <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-map-marker-alt fa-fw"></i> Lokasi Penempatan ONU (Live Map)
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="embed-responsive" style="height: 450px;">
+                        <iframe src="https://www.google.com/maps/d/embed?mid=1yl6oV82Y660a_37p_2cjhicjhJn-9mk&ehbc=2E312F" width="640" height="480"></iframe>
+                    </div>
+                    <div class="p-3">
+                        <strong>Nama Aset:</strong> <?= $onu->name ?><br>
+                        <small class="text-muted italic">*Peta tersinkronisasi otomatis dengan Google My Maps Diskominfo.</small>
+                    </div>
+                </div>
+            </div>
             <div class="card shadow mb-4 border-left-success">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-success text-uppercase small">
@@ -73,7 +89,7 @@
 
                         <div class="form-group mb-4">
                             <label class="font-weight-bold small text-muted text-uppercase">Deskripsi Pelanggan (Name)</label>
-                            <input type="text" name="new_name" class="form-control font-weight-bold border-left-primary" value="<?= $onu->name ?>" placeholder="Contoh: JAMAL_NOC">
+                            <input type="text" name="new_name" class="form-control font-weight-bold border-left-primary" value="<?= $onu->name ?>" placeholder="Contoh: KMF_NOC">
                         </div>
 
                         <div class="row">
@@ -121,43 +137,41 @@
                 </div>
             </div>
 
-             <div class="card shadow mb-4 border-left-danger">
-    <div class="card-header py-3 bg-gray-100">
-        <h6 class="m-0 font-weight-bold text-danger text-uppercase small">Danger Zone</h6>
-    </div>
-    <div class="card-body">
-        <p class="small text-dark mb-3">Tindakan ini akan menghapus registrasi ONU di OLT dan menghapus data dari database sistem secara permanen.</p>
+            <div class="card shadow mb-4 border-left-danger">
+                <div class="card-header py-3 bg-gray-100">
+                    <h6 class="m-0 font-weight-bold text-danger text-uppercase small">Danger Zone</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-dark mb-3">Tindakan ini akan menghapus registrasi ONU di OLT dan menghapus data dari database sistem secara permanen.</p>
 
-        <?php
-            // Generate angka acak baru setiap halaman dimuat
-            $val1 = rand(1, 9);
-            $val2 = rand(1, 9);
-            session()->set('captcha_result', $val1 + $val2);
-        ?>
+                    <?php
+                        $val1 = rand(1, 9);
+                        $val2 = rand(1, 9);
+                        session()->set('captcha_result', $val1 + $val2);
+                    ?>
 
-        <form action="<?= base_url('olt/delete_onu') ?>" method="POST" class="p-3 border rounded bg-light">
-            <?= csrf_field() ?>
+                    <form action="<?= base_url('olt/delete_onu') ?>" method="POST" class="p-3 border rounded bg-light">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="onu_index" value="<?= $onu->onu_index ?>">
 
-            <input type="hidden" name="onu_index" value="<?= $onu->onu_index ?>">
+                        <div class="form-group mb-3">
+                            <label class="small font-weight-bold text-danger text-uppercase">Keamanan: Hitung Hasil Penjumlahan</label>
+                            <div class="input-group" style="max-width: 300px;">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-danger text-white font-weight-bold shadow-sm">
+                                        <?= $val1 ?> + <?= $val2 ?> =
+                                    </span>
+                                </div>
+                                <input type="number" name="user_captcha" class="form-control shadow-sm" placeholder="Isi Jawaban..." required>
+                            </div>
+                        </div>
 
-            <div class="form-group mb-3">
-                <label class="small font-weight-bold text-danger text-uppercase">Keamanan: Hitung Hasil Penjumlahan</label>
-                <div class="input-group" style="max-width: 300px;">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text bg-danger text-white font-weight-bold shadow-sm">
-                            <?= $val1 ?> + <?= $val2 ?> =
-                        </span>
-                    </div>
-                    <input type="number" name="user_captcha" class="form-control shadow-sm" placeholder="Isi Jawaban..." required>
+                        <button type="submit" class="btn btn-danger btn-sm px-3 font-weight-bold text-uppercase shadow-sm">
+                            <i class="fas fa-trash-alt mr-1"></i> VALIDASI & HAPUS ONU
+                        </button>
+                    </form>
                 </div>
             </div>
-
-            <button type="submit" class="btn btn-danger btn-sm px-3 font-weight-bold text-uppercase shadow-sm">
-                <i class="fas fa-trash-alt mr-1"></i> VALIDASI & HAPUS ONU
-            </button>
-        </form>
-    </div>
-</div>
 
         </div>
     </div>
