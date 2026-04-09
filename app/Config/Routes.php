@@ -43,3 +43,6 @@ $routes->post('olt/update_config', 'Olt::update_config');
 //tombol HAPUS ONU
 $routes->post('olt/delete_onu', 'Olt::delete_onu');
 $routes->get('olt/unconfig', 'Olt::unconfig');
+
+// Route untuk menyimpan koordinat GIS ke SQLite
+$routes->post('olt/save_gis', 'Olt::save_gis');

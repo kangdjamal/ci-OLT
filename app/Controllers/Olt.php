@@ -420,6 +420,25 @@ class Olt extends BaseController
     }
 
     //////////////////////
+    private function _getGisData($onu_index)
+    {
+        try {
+            $db_gis_config = [
+                'DBDriver' => 'SQLite3',
+                'database' => WRITEPATH . 'onu_gis.sqlite3',
+            ];
+            $db_gis = \Config\Database::connect($db_gis_config);
+
+            // Gunakan trim untuk memastikan tidak ada spasi di awal/akhir index
+            return $db_gis->table('onu_locations')
+            ->where('onu_index', trim($onu_index))
+            ->get()
+            ->getRow();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     //////////////////////
 
 
@@ -507,7 +526,37 @@ class Olt extends BaseController
             'gpon_id' => $db_index
         ];
 
+
+        // ... (di bagian akhir function manage sebelum return view)
+
+        // --- START DEBUG ---
+        $gis = $this->_getGisData($db_index);
+
+        // Coba kita paksa dump kalau datanya tidak ketemu
+        if (!$gis) {
+            // Ini akan berhenti dan menampilkan isi variabel ke layar
+            // Perhatikan apakah 'mencari' sama persis dengan yang ada di CLI tadi
+            dd([
+                'status' => 'DATA SQLITE TIDAK DITEMUKAN',
+               'mencari_index' => $db_index,
+               'path_db' => WRITEPATH . 'database/onu_gis.sqlite3',
+               'file_exists' => file_exists(WRITEPATH . 'database/onu_gis.sqlite3'),
+               'is_readable' => is_readable(WRITEPATH . 'database/onu_gis.sqlite3')
+            ]);
+        }
+        // --- END DEBUG ---
+
+        $onu_updated->latitude  = $gis->latitude;
+        $onu_updated->longitude = $gis->longitude;
+
+        $data = [
+            'title'   => "Manage: " . $db_index,
+            'onu'     => $onu_updated,
+            'gpon_id' => $db_index
+        ];
+
         return view('manage_onu', $data);
+
     }
 
 //////////
@@ -613,8 +662,49 @@ public function update_config()
         }
     }
 
-    ////////
+    ////////SAVE GIS
 
+    public function save_gis()
+    {
+        // Ambil data dari POST
+        $onu_index = $this->request->getPost('onu_index');
+        $lat       = $this->request->getPost('latitude');
+        $lng       = $this->request->getPost('longitude');
+
+        if (!$onu_index || !$lat || !$lng) {
+            return redirect()->back()->with('pesan', 'Data koordinat tidak lengkap!')->with('warna', 'danger');
+        }
+
+        // Konfigurasi Database SQLite ONU GIS
+        $db_gis = [
+            'DBDriver' => 'SQLite3',
+            'database' => WRITEPATH . 'onu_gis.sqlite3', // Pastikan file ini ada & writable
+            'DBDebug'  => true
+        ];
+
+        $db = \Config\Database::connect($db_gis);
+        $builder = $db->table('onu_locations');
+
+        // Cek record lama
+        $exists = $builder->where('onu_index', $onu_index)->countAllResults();
+
+        $data = [
+            'onu_index'  => $onu_index,
+            'latitude'   => $lat,
+            'longitude'  => $lng,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        if ($exists > 0) {
+            $builder->where('onu_index', $onu_index)->update($data);
+        } else {
+            $builder->insert($data);
+        }
+
+        return redirect()->back()->with('pesan', "Koordinat ONU $onu_index berhasil diperbarui di SQLite!")->with('warna', 'success');
+    }
+
+    //////////////////////
     public function logout()
     {
         // Menghapus semua data session yang kita set tadi
