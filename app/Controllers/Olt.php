@@ -469,7 +469,7 @@ class Olt extends BaseController
 
         $allowed_status = ['ready', 'working', 'online', 'up'];
 
-        if (!in_array($check_status, $allowed_status)) {
+        /*if (!in_array($check_status, $allowed_status)) {
             $pesan = "ONU [$db_index] tidak dapat dimanage. ";
 
             if (empty($check_status) || $check_status == "-") {
@@ -481,7 +481,7 @@ class Olt extends BaseController
             session()->setFlashdata('pesan', $pesan);
             session()->setFlashdata('warna', 'warning');
             return redirect()->to(base_url('olt/dashboard'));
-        }
+        }*/
 
         // 4. Jalankan Python
         $python = env('PYTHON_VENV');
@@ -530,25 +530,22 @@ class Olt extends BaseController
         // ... (di bagian akhir function manage sebelum return view)
 
         // --- START DEBUG ---
+        // 1. Ambil data dari SQLite
         $gis = $this->_getGisData($db_index);
 
-        // Coba kita paksa dump kalau datanya tidak ketemu
-        if (!$gis) {
-            // Ini akan berhenti dan menampilkan isi variabel ke layar
-            // Perhatikan apakah 'mencari' sama persis dengan yang ada di CLI tadi
-            dd([
-                'status' => 'DATA SQLITE TIDAK DITEMUKAN',
-               'mencari_index' => $db_index,
-               'path_db' => WRITEPATH . 'database/onu_gis.sqlite3',
-               'file_exists' => file_exists(WRITEPATH . 'database/onu_gis.sqlite3'),
-               'is_readable' => is_readable(WRITEPATH . 'database/onu_gis.sqlite3')
-            ]);
+        // 2. Cek apakah ketemu atau tidak
+        if ($gis) {
+            // Jika ADA di database
+            $onu_updated->latitude  = (float) $gis->latitude;
+            $onu_updated->longitude = (float) $gis->longitude;
+        } else {
+            // Jika TIDAK ADA (Hapus dd() kemarin, ganti dengan fallback ini)
+            // Peta akan tetap tampil tapi di titik default
+            $onu_updated->latitude  = -7.6775;
+            $onu_updated->longitude = 110.8324;
         }
-        // --- END DEBUG ---
 
-        $onu_updated->latitude  = $gis->latitude;
-        $onu_updated->longitude = $gis->longitude;
-
+        // 3. Kirim ke View
         $data = [
             'title'   => "Manage: " . $db_index,
             'onu'     => $onu_updated,
